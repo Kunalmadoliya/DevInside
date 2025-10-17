@@ -1,0 +1,78 @@
+# -----------------------
+# OS
+# -----------------------
+.DS_Store
+Thumbs.db
+
+# -----------------------
+# Node
+# -----------------------
+node_modules/
+npm-debug.log*
+yarn-error.log
+.pnp.*
+/dist
+/build
+/.turbo
+
+# -----------------------
+# Python
+# -----------------------
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.env
+venv/
+.venv/
+build/
+dist/
+*.egg-info/
+
+# -----------------------
+# Java
+# -----------------------
+/target/
+/bin/
+/*.class
+*.jar
+*.war
+.idea/
+*.iml
+
+# -----------------------
+# IDEs / Editors
+# -----------------------
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.swp
+
+# -----------------------
+# Logs, temp, secrets
+# -----------------------
+*.log
+*.tmp
+*.temp
+.env.local
+.env.*.local
+secrets.*
+/coverage/
+coverage-final.json
+
+# -----------------------
+# Misc / Build artefacts
+# -----------------------
+*.exe
+*.dll
+*.so
+/*.egg
+dist/
+build/
+
+# -----------------------
+# Lockfiles that sometimes you DO want to ignore (optional)
+# -----------------------
+# package-lock.json
+# yarn.lock
