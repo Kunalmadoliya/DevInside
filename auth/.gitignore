@@ -8,6 +8,7 @@ Thumbs.db
 # Node
 # -----------------------
 node_modules/
+node_modules
 npm-debug.log*
 yarn-error.log
 .pnp.*
@@ -55,6 +56,7 @@ dist/
 *.log
 *.tmp
 *.temp
+.env
 .env.local
 .env.*.local
 secrets.*
