@@ -13,6 +13,6 @@ const router = express.Router();
 
 router.post("/register", registerUserValidations, registerUser);
 router.post("/login", loginUserValidations, loginUser);
-router.post("/logout", logoutUser);
+router.get("/logout", logoutUser);
 
 module.exports = router;

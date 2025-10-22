@@ -15,7 +15,7 @@ describe("POST /api/auth/register", () => {
         userName: "john_doe",
         email: "john@example.com",
         password: "Secret123!",
-      });
+      })
 
     expect(res.status).toBe(201);
     expect(res.body.user).toBeDefined();

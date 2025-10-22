@@ -58,11 +58,11 @@ async function registerUser(req, res) {
       message: "User registered successfully",
       token,
       user: {
-        userName : user.userName,
+        userName: user.userName,
         id: user._id,
         email: user.email,
         role: user.role,
-        fullName: user.fullName.firstName ,
+        fullName: user.fullName.firstName,
       },
     });
   } catch (error) {
@@ -75,33 +75,36 @@ async function registerUser(req, res) {
 async function loginUser(req, res) {
   try {
     const {email, password} = req.body;
-
-    if (!email || !password) {
+    if (!email || !password)
       return res.status(400).json({message: "Email and Password are required"});
-    }
 
     const user = await userModel.findOne({email}).select("+password");
-    if (!user) {
-      return res.status(400).json({message: "Invalid email or password"});
-    }
+    if (!user)
+      return res.status(401).json({message: "Invalid email or password"});
 
-    const isPassword = bcrypt.compare(password, user.password);
-    if (!isPassword) {
-      return res.status(400).json({message: "Invalid email or password"});
-    }
+    const isPassword = await bcrypt.compare(password, user.password);
+    if (!isPassword)
+      return res.status(401).json({message: "Invalid email or password"});
 
     const token = generateToken(user._id, user.email, user.role);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
 
     return res.status(200).json({
       success: true,
       message: "User logged in successfully",
       token,
       user: {
-        userName : user.userName , 
+        userName: user.userName,
         id: user._id,
         email: user.email,
         role: user.role,
-        fullName: user.fullName.firstName,
+        fullName: user.fullName,
       },
     });
   } catch (error) {
@@ -116,20 +119,20 @@ async function logoutUser(req, res) {
     const token =
       req.cookies?.token || req.header("Authorization")?.replace("Bearer ", "");
 
-    if (token) {
+    if (token && redis?.set) {
       await redis.set(`blacklist:${token}`, "true", "EX", 24 * 60 * 60);
-      res.clearCookie("token", {
-        httpOnly: true,
-        secure: true,
-        sameSite: "Strict",
-        maxAge: 0,
-      });
-      return res
-        .status(200)
-        .json({success: true, message: "User logged out successfully"});
     }
 
-    return res.status(400).json({message: "No token found"});
+    res.clearCookie("token", {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Strict",
+      maxAge: 0,
+    });
+
+    return res
+      .status(200)
+      .json({success: true, message: "User logged out successfully"});
   } catch (error) {
     return res
       .status(500)
