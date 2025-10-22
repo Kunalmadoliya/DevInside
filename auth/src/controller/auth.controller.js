@@ -1,57 +1,75 @@
 const jwt = require("jsonwebtoken");
 const userModel = require("../models/auth.model");
 const bcrypt = require("bcrypt");
+const redis = require("../db/redis");
 
 function generateToken(id, email, role) {
-  return jwt.sign({id, email, role}, process.env.JWT_SECRET, {expiresIn: "7d"});
+  return jwt.sign({id, email, role}, process.env.JWT_SECRET, {
+    expiresIn: "7d",
+  });
 }
 
 async function registerUser(req, res) {
-  const {userName: {firstName, lastName} = {}, email, password} = req.body;
+  try {
+    const {userName, fullName, email, password} = req.body;
+    const {firstName, lastName} = fullName || {};
 
-  if (!userName || !firstName || !lastName || !email || !password) {
-    return res.status(400).json({message: "All fields are required"});
-  }
+    if (
+      !userName ||
+      !fullName ||
+      !firstName ||
+      !lastName ||
+      !email ||
+      !password
+    ) {
+      return res.status(400).json({message: "All fields are required"});
+    }
 
-  const userExist = await userModel.findOne({email});
+    const userExist = await userModel.findOne({email});
+    if (userExist) {
+      return res
+        .status(409)
+        .json({success: false, message: "User already exists"});
+    }
 
-  if (userExist) {
+    const hashedPassword = await bcrypt.hash(
+      password,
+      parseInt(process.env.SALT_ROUNDS) || 10
+    );
+
+    const user = await userModel.create({
+      userName,
+      fullName: {firstName, lastName},
+      email,
+      password: hashedPassword,
+    });
+
+    const token = generateToken(user._id, user.email, user.role);
+
+    res.cookie("token", token, {
+      httpOnly: true,
+      secure: true,
+      sameSite: "Strict",
+      maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days to match JWT
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "User registered successfully",
+      token,
+      user: {
+        userName : user.userName,
+        id: user._id,
+        email: user.email,
+        role: user.role,
+        fullName: user.fullName.firstName ,
+      },
+    });
+  } catch (error) {
     return res
-      .status(400)
-      .json({success: false, message: "User already exists"});
+      .status(500)
+      .json({message: "Server Error", details: error.message});
   }
-
-  const hashedPassword = await bcrypt.hash(
-    password,
-    parseInt(process.env.SALT_ROUNDS) || 10
-  );
-
-  const user = await userModel.create({
-    userName: {firstName, lastName},
-    email,
-    password: hashedPassword,
-  });
-
-  const token = generateToken(user.id, user.email, user.role);
-
-  res.cookie("token", token, {
-    httpOnly: true,
-    secure: true,
-    sameSite: "Strict",
-    maxAge: 24 * 60 * 60 * 1000, // 1 day
-  });
-
-  return res.status(201).json({
-    success: true,
-    message: "User register Success",
-    token,
-    user: {
-      id: user._id,
-      email: user.email,
-      role: user.role,
-      username: user.fullName.firstName,
-    },
-  });
 }
 
 async function loginUser(req, res) {
@@ -59,50 +77,74 @@ async function loginUser(req, res) {
     const {email, password} = req.body;
 
     if (!email || !password) {
-      return res
-        .status(400)
-        .json({message: "Email and Password are require!!"});
+      return res.status(400).json({message: "Email and Password are required"});
     }
 
     const user = await userModel.findOne({email}).select("+password");
-
     if (!user) {
       return res.status(400).json({message: "Invalid email or password"});
     }
 
     const isPassword = bcrypt.compare(password, user.password);
+    if (!isPassword) {
+      return res.status(400).json({message: "Invalid email or password"});
+    }
 
-    if (!isPassword)
-      return res.status(400).json({message: "Invalid email or password!"});
-
-    const token = generateToken(user.id, user.email, user.role);
+    const token = generateToken(user._id, user.email, user.role);
 
     return res.status(200).json({
       success: true,
       message: "User logged in successfully",
       token,
       user: {
+        userName : user.userName , 
         id: user._id,
         email: user.email,
         role: user.role,
-        username: user.fullName.firstName,
+        fullName: user.fullName.firstName,
       },
     });
   } catch (error) {
-    res.status(500).json({message: "Sever Error", details: error.message});
+    return res
+      .status(500)
+      .json({message: "Server Error", details: error.message});
   }
 }
 
-async function updateUser(){
+async function logoutUser(req, res) {
+  try {
+    const token =
+      req.cookies?.token || req.header("Authorization")?.replace("Bearer ", "");
 
+    if (token) {
+      await redis.set(`blacklist:${token}`, "true", "EX", 24 * 60 * 60);
+      res.clearCookie("token", {
+        httpOnly: true,
+        secure: true,
+        sameSite: "Strict",
+        maxAge: 0,
+      });
+      return res
+        .status(200)
+        .json({success: true, message: "User logged out successfully"});
+    }
+
+    return res.status(400).json({message: "No token found"});
+  } catch (error) {
+    return res
+      .status(500)
+      .json({message: "Server Error", details: error.message});
+  }
 }
 
-async function  deleteUser() {
-  
+async function updateUser(req, res) {
+  // Implement user update logic here
+  return res.status(501).json({message: "Update user not implemented yet"});
 }
 
-async function logoutUser(){
-
+async function deleteUser(req, res) {
+  // Implement user deletion logic here
+  return res.status(501).json({message: "Delete user not implemented yet"});
 }
 
-module.exports = {loginUser, registerUser , updateUser , deleteUser, logoutUser};
+module.exports = {loginUser, registerUser, updateUser, deleteUser, logoutUser};
