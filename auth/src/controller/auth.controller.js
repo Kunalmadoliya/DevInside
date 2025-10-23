@@ -146,8 +146,8 @@ async function logoutUser(req, res) {
 
 
 async function updateUser(req, res) {
-  // Implement user update logic here
-  return res.status(501).json({message: "Update user not implemented yet"});
+  const {userName , password ,  } = req.body 
+  
 }
 
 async function deleteUser(req, res) {
