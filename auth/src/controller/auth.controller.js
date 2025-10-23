@@ -119,26 +119,31 @@ async function logoutUser(req, res) {
     const token =
       req.cookies?.token || req.header("Authorization")?.replace("Bearer ", "");
 
-    if (token && redis?.set) {
-      await redis.set(`blacklist:${token}`, "true", "EX", 24 * 60 * 60);
+    if (token && global.redis && typeof redis.set === "function") {
+      try {
+        await redis.set(`blacklist:${token}`, "true", "EX", 24 * 60 * 60);
+      } catch (err) {
+        console.warn("⚠️ Redis unavailable during logout, skipping...");
+      }
     }
 
-    res.clearCookie("token", {
+    res.cookie("token", "", {
       httpOnly: true,
       secure: true,
       sameSite: "Strict",
-      maxAge: 0,
+      expires: new Date(0),
     });
 
     return res
       .status(200)
-      .json({success: true, message: "User logged out successfully"});
+      .json({ success: true, message: "User logged out successfully" });
   } catch (error) {
     return res
       .status(500)
-      .json({message: "Server Error", details: error.message});
+      .json({ message: "Server Error", details: error.message });
   }
 }
+
 
 async function updateUser(req, res) {
   // Implement user update logic here

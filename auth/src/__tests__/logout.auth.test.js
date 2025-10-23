@@ -1,68 +1,55 @@
 const request = require("supertest");
 const bcrypt = require("bcrypt");
-const mongoose = require("mongoose");
-
 const app = require("../app");
-const userModel = require("../models/auth.model");
+const connectDB = require("../db/db");
+const User = require("../models/auth.model");
 
-beforeAll(async () => {
-  const uri = process.env.MONGO_URI;
-  if (!uri) throw new Error("Missing MONGO_URI in .env.test");
-  await mongoose.connect(uri);
-  console.log("✅ Connected to test database");
-});
-
-afterAll(async () => {
-  await mongoose.connection.dropDatabase();
-  await mongoose.connection.close();
-  console.log("🧹 Test database closed");
-});
-
-beforeEach(async () => {
-  await userModel.deleteMany({});
-});
+jest.setTimeout(20000);
 
 describe("GET /api/auth/logout", () => {
-  it(
-    "clears the auth cookie and returns 200 when logged in",
-    async () => {
-      const password = "Secret123!";
-      const hashedPassword = await bcrypt.hash(password, 10);
-      await userModel.create({
-        fullName: { firstName: "Log", lastName: "Out" },
-        userName: "logout_user",
-        email: "logout@example.com",
-        password: hashedPassword,
-      });
+  let cookie;
 
-      const loginRes = await request(app)
-        .post("/api/auth/login")
-        .send({ email: "logout@example.com", password });
+  beforeAll(async () => {
+    await connectDB();
+  });
 
+  beforeEach(async () => {
+    await User.deleteMany({});
+  });
+  beforeEach(async () => {
+    const hashedPassword = await bcrypt.hash("logout123", 10);
+    await User.create({
+      userName: "logout_user",
+      email: "logout@example.com",
+      password: hashedPassword,
+      fullName: {firstName: "Log", lastName: "Out"},
+      role: "user",
+    });
 
-        console.log(lo);
-        
+    const res = await request(app)
+      .post("/api/auth/login")
+      .send({email: "logout@example.com", password: "logout123"})
+      .expect(200);
 
-      expect(loginRes.status).toBe(200);
-      const cookies = loginRes.headers["set-cookie"];
-      expect(cookies).toBeDefined();
+    cookie = res.headers["set-cookie"];
+  });
 
-      const res = await request(app)
-        .get("/api/auth/logout")
-        .set("Cookie", cookies);
+  it("should clear auth cookie and return 200 when logged in", async () => {
+    const res = await request(app)
+      .get("/api/auth/logout")
+      .set("Cookie", cookie)
+      .expect(200);
 
-      expect(res.status).toBe(200);
-      const setCookie = res.headers["set-cookie"] || [];
-      const cookieStr = setCookie.join(";");
-      expect(cookieStr).toMatch(/token=;/);
-      expect(cookieStr.toLowerCase()).toMatch(/expires=/);
-    },
-    20000 // increased timeout
-  );
+    const cookieStr = res.headers["set-cookie"]?.[0] || "";
+    expect(cookieStr).toMatch(/token=;/);
+    expect(cookieStr.toLowerCase()).toMatch(/expires=/);
+    expect(res.body.success).toBe(true);
+    expect(res.body.message).toBe("User logged out successfully");
+  });
 
-  it("is idempotent: returns 200 even without auth cookie", async () => {
-    const res = await request(app).get("/api/auth/logout");
-    expect(res.status).toBe(200);
+  it("should return 200 even without auth cookie", async () => {
+    const res = await request(app).get("/api/auth/logout").expect(200);
+    expect(res.body.success).toBe(true);
     expect(res.body.message).toBe("User logged out successfully");
   });
 });
